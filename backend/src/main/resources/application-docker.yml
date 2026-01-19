@@ -1,0 +1,14 @@
+# Docker deployment configuration
+spring:
+  jpa:
+    show-sql: false
+
+storage:
+  type: local
+  local:
+    path: /app/uploads
+
+logging:
+  level:
+    com.mira: INFO
+    org.springframework: WARN

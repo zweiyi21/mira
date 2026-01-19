@@ -1,0 +1,29 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build outputs
+backend/build/
+backend/.gradle/
+frontend/dist/
+frontend/node_modules/
+
+# Local config
+backend/src/main/resources/application-local.yml
+
+# Uploads
+uploads/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+.claude/

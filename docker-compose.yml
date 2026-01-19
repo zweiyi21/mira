@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mira-postgres
+    environment:
+      POSTGRES_DB: mira
+      POSTGRES_USER: mira
+      POSTGRES_PASSWORD: mira
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mira -d mira"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: mira-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service (for full docker deployment)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mira-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/mira
+      DATABASE_USERNAME: mira
+      DATABASE_PASSWORD: mira
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key-change-in-production-at-least-32-chars}
+      STORAGE_TYPE: local
+      APP_ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    profiles:
+      - full
+
+  # Frontend Service (for full docker deployment)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mira-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    profiles:
+      - full
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

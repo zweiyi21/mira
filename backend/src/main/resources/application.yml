@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: mira-backend
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/mira}
+    username: ${DATABASE_USERNAME:mira}
+    password: ${DATABASE_PASSWORD:mira}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-for-development-only-change-in-production}
+  expiration: 86400000  # 24 hours in milliseconds
+  refresh-expiration: 604800000  # 7 days in milliseconds
+
+# AWS S3 Configuration (for production)
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET:mira-attachments}
+    region: ${AWS_REGION:us-east-1}
+
+# Local file storage (for development)
+storage:
+  type: ${STORAGE_TYPE:local}  # 'local' or 's3'
+  local:
+    path: ${STORAGE_LOCAL_PATH:./uploads}
+
+# OpenAPI Documentation
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+logging:
+  level:
+    com.mira: DEBUG
+    org.springframework.security: INFO
