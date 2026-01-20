@@ -5,6 +5,7 @@ import java.time.Instant
 
 enum class NotificationType {
     TEAM_INVITATION,
+    PROJECT_INVITATION,
     ISSUE_ASSIGNED,
     ISSUE_DUE_TODAY,
     ISSUE_DUE_TOMORROW,

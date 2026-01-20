@@ -403,10 +403,11 @@ npm run dev
 ## 待完成功能 (Future)
 
 ### 功能增强
-- [ ] 排序功能 (按创建时间、截止时间、优先级、Story Points)
+- [x] 排序功能 (按创建时间、截止时间、优先级、Story Points)
+- [x] Sprint 管理 UI (启动 Sprint、完成 Sprint、创建下一个 Sprint)
+- [x] Sprint 燃尽图
 - [ ] Issue 活动历史展示
 - [ ] 标签管理 UI (创建/编辑/删除项目标签)
-- [ ] Sprint 燃尽图
 - [ ] 项目仪表盘统计
 - [ ] 用户头像上传
 - [ ] 邮件通知

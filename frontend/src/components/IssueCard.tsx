@@ -7,6 +7,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import type { Issue, IssueType, IssuePriority } from '../types'
+import { userService } from '../services/userService'
 
 const TYPE_ICONS: Record<IssueType, React.ReactNode> = {
   EPIC: <ThunderboltOutlined style={{ color: '#6554c0' }} />,
@@ -58,7 +59,10 @@ function IssueCard({ issue, onClick }: IssueCardProps) {
           </Tooltip>
           {issue.assignee ? (
             <Tooltip title={issue.assignee.name}>
-              <Avatar size="small" src={issue.assignee.avatarUrl}>
+              <Avatar
+                size="small"
+                src={issue.assignee.avatarUrl ? userService.getAvatarUrl(issue.assignee.id) : undefined}
+              >
                 {issue.assignee.name[0]}
               </Avatar>
             </Tooltip>

@@ -86,4 +86,13 @@ class SprintController(
     ): ResponseEntity<SprintDto> {
         return ResponseEntity.ok(sprintService.createNextSprint(projectKey, principal.id))
     }
+
+    @GetMapping("/{sprintId}/burndown")
+    fun getBurndownData(
+        @PathVariable projectKey: String,
+        @PathVariable sprintId: Long,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ResponseEntity<BurndownChartData> {
+        return ResponseEntity.ok(sprintService.getBurndownData(projectKey, sprintId, principal.id))
+    }
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Avatar, Dropdown, Button, Space } from 'antd'
 import {
@@ -5,9 +6,12 @@ import {
   LogoutOutlined,
   UserOutlined,
   TeamOutlined,
+  CameraOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
+import { userService } from '../services/userService'
 import NotificationBell from './NotificationBell'
+import AvatarUploadModal from './AvatarUploadModal'
 
 const { Header, Sider, Content } = Layout
 
@@ -15,14 +19,23 @@ function MainLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  const avatarUrl = user?.avatarUrl ? userService.getAvatarUrl(user.id) : undefined
+
   const userMenu = {
     items: [
+      {
+        key: 'avatar',
+        icon: <CameraOutlined />,
+        label: 'Change Avatar',
+        onClick: () => setAvatarModalOpen(true),
+      },
       {
         key: 'logout',
         icon: <LogoutOutlined />,
@@ -53,7 +66,7 @@ function MainLayout() {
   ]
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       <Header
         style={{
           display: 'flex',
@@ -70,12 +83,18 @@ function MainLayout() {
           <NotificationBell />
           <Dropdown menu={userMenu} placement="bottomRight">
             <Button type="text" style={{ color: '#fff' }}>
-              <Avatar icon={<UserOutlined />} size="small" style={{ marginRight: 8 }} />
+              <Avatar
+                icon={!avatarUrl && <UserOutlined />}
+                src={avatarUrl}
+                size="small"
+                style={{ marginRight: 8 }}
+              />
               {user?.name}
             </Button>
           </Dropdown>
         </Space>
       </Header>
+
       <Layout>
         <Sider width={200} style={{ background: '#fff' }}>
           <Menu
@@ -89,13 +108,20 @@ function MainLayout() {
           style={{
             padding: 24,
             margin: 0,
-            minHeight: 280,
             background: '#f0f2f5',
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
           <Outlet />
         </Content>
       </Layout>
+
+      <AvatarUploadModal
+        open={avatarModalOpen}
+        onClose={() => setAvatarModalOpen(false)}
+      />
     </Layout>
   )
 }

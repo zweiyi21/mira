@@ -26,6 +26,7 @@ import {
 import dayjs from 'dayjs'
 import type { Issue, IssueType, IssuePriority, IssueStatus } from '../types'
 import { issueService } from '../services/issueService'
+import { userService } from '../services/userService'
 import { useProjectStore } from '../stores/projectStore'
 import CommentList from './CommentList'
 import AttachmentList from './AttachmentList'
@@ -275,7 +276,7 @@ export default function IssueDetailModal({
                 {members.map((m) => (
                   <Select.Option key={m.user.id} value={m.user.id}>
                     <Space>
-                      <Avatar size="small" src={m.user.avatarUrl}>
+                      <Avatar size="small" src={m.user.avatarUrl ? userService.getAvatarUrl(m.user.id) : undefined}>
                         {m.user.name[0]}
                       </Avatar>
                       {m.user.name}

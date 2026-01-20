@@ -1,6 +1,9 @@
 import api from './api'
 import type { Issue, CreateIssueRequest, UpdateIssueRequest, MoveIssueRequest, IssueStatus, IssuePriority, IssueType } from '../types'
 
+export type SortField = 'createdAt' | 'dueDate' | 'priority' | 'storyPoints'
+export type SortOrder = 'asc' | 'desc'
+
 export interface IssueFilters {
   sprintId?: number
   search?: string
@@ -8,6 +11,8 @@ export interface IssueFilters {
   priority?: IssuePriority
   assigneeId?: number
   type?: IssueType
+  sortBy?: SortField
+  sortOrder?: SortOrder
 }
 
 export const issueService = {
@@ -19,13 +24,18 @@ export const issueService = {
     if (filters?.priority) params.priority = filters.priority
     if (filters?.assigneeId) params.assigneeId = filters.assigneeId
     if (filters?.type) params.type = filters.type
+    if (filters?.sortBy) params.sortBy = filters.sortBy
+    if (filters?.sortOrder) params.sortOrder = filters.sortOrder
 
     const response = await api.get<Issue[]>(`/projects/${projectKey}/issues`, { params })
     return response.data
   },
 
-  async getBacklog(projectKey: string): Promise<Issue[]> {
-    const response = await api.get<Issue[]>(`/projects/${projectKey}/issues/backlog`)
+  async getBacklog(projectKey: string, sortBy?: SortField, sortOrder?: SortOrder): Promise<Issue[]> {
+    const params: Record<string, any> = {}
+    if (sortBy) params.sortBy = sortBy
+    if (sortOrder) params.sortOrder = sortOrder
+    const response = await api.get<Issue[]>(`/projects/${projectKey}/issues/backlog`, { params })
     return response.data
   },
 

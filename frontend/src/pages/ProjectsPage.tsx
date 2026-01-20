@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, List, Modal, Form, Input, message, Empty } from 'antd'
-import { PlusOutlined, ProjectOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, ProjectOutlined, DeleteOutlined, UserAddOutlined } from '@ant-design/icons'
 import { projectService } from '../services/projectService'
 import { useProjectStore } from '../stores/projectStore'
+import InviteMemberModal from '../components/InviteMemberModal'
 import type { Project } from '../types'
 
 function ProjectsPage() {
@@ -11,6 +12,8 @@ function ProjectsPage() {
   const { projects, setProjects } = useProjectStore()
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [inviteModalVisible, setInviteModalVisible] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [form] = Form.useForm()
 
   useEffect(() => {
@@ -64,6 +67,11 @@ function ProjectsPage() {
     })
   }
 
+  const handleInviteMember = (project: Project) => {
+    setSelectedProject(project)
+    setInviteModalVisible(true)
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -88,6 +96,13 @@ function ProjectsPage() {
                 actions={[
                   <Button type="link" onClick={(e) => { e.stopPropagation(); goToBoard(project) }}>
                     Open Board
+                  </Button>,
+                  <Button
+                    type="link"
+                    icon={<UserAddOutlined />}
+                    onClick={(e) => { e.stopPropagation(); handleInviteMember(project) }}
+                  >
+                    Invite
                   </Button>,
                   <Button
                     type="link"
@@ -156,6 +171,17 @@ function ProjectsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {selectedProject && (
+        <InviteMemberModal
+          project={selectedProject}
+          open={inviteModalVisible}
+          onClose={() => {
+            setInviteModalVisible(false)
+            setSelectedProject(null)
+          }}
+        />
+      )}
     </div>
   )
 }

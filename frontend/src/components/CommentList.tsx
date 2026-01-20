@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import type { Comment } from '../types'
 import { commentService } from '../services/commentService'
+import { userService } from '../services/userService'
 import { useAuthStore } from '../stores/authStore'
 
 dayjs.extend(relativeTime)
@@ -116,7 +117,7 @@ export default function CommentList({ projectKey, issueKey }: CommentListProps) 
           >
             <List.Item.Meta
               avatar={
-                <Avatar src={comment.author.avatarUrl}>
+                <Avatar src={comment.author.avatarUrl ? userService.getAvatarUrl(comment.author.id) : undefined}>
                   {comment.author.name[0]}
                 </Avatar>
               }

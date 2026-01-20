@@ -54,3 +54,23 @@ data class AddMemberRequest(
 data class UpdateMemberRoleRequest(
     val role: ProjectRole
 )
+
+data class InviteMemberRequest(
+    @field:NotBlank(message = "Email is required")
+    val email: String
+)
+
+data class ProjectInvitationDto(
+    val id: Long,
+    val project: ProjectSummaryDto,
+    val inviter: UserDto,
+    val invitee: UserDto,
+    val status: String,
+    val createdAt: Instant
+)
+
+data class ProjectSummaryDto(
+    val id: Long,
+    val name: String,
+    val key: String
+)

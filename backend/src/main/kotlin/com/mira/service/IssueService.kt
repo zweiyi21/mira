@@ -28,7 +28,9 @@ class IssueService(
         status: String? = null,
         priority: String? = null,
         assigneeId: Long? = null,
-        type: String? = null
+        type: String? = null,
+        sortBy: String? = null,
+        sortOrder: String? = null
     ): List<IssueDto> {
         val project = projectRepository.findByKey(projectKey.uppercase())
             .orElseThrow { IllegalArgumentException("Project not found") }
@@ -70,17 +72,24 @@ class IssueService(
             issues = issues.filter { it.type == typeEnum }
         }
 
+        // Apply sorting
+        issues = applySorting(issues, sortBy, sortOrder)
+
         return issues.map { it.toDto() }
     }
 
-    fun getBacklog(projectKey: String, userId: Long): List<IssueDto> {
+    fun getBacklog(projectKey: String, userId: Long, sortBy: String? = null, sortOrder: String? = null): List<IssueDto> {
         val project = projectRepository.findByKey(projectKey.uppercase())
             .orElseThrow { IllegalArgumentException("Project not found") }
 
         projectService.checkMembership(project.id, userId)
 
-        return issueRepository.findAllByProjectIdAndSprintIdIsNull(project.id)
-            .map { it.toDto() }
+        var issues = issueRepository.findAllByProjectIdAndSprintIdIsNull(project.id)
+
+        // Apply sorting
+        issues = applySorting(issues, sortBy, sortOrder)
+
+        return issues.map { it.toDto() }
     }
 
     fun getIssueByKey(projectKey: String, issueKey: String, userId: Long): IssueDto {
@@ -302,6 +311,22 @@ class IssueService(
                 newValue = newValue
             )
         )
+    }
+
+    private fun applySorting(issues: List<Issue>, sortBy: String?, sortOrder: String?): List<Issue> {
+        if (sortBy.isNullOrBlank()) {
+            return issues.sortedBy { it.orderIndex }
+        }
+
+        val sorted = when (sortBy) {
+            "createdAt" -> issues.sortedBy { it.createdAt }
+            "dueDate" -> issues.sortedBy { it.dueDate }
+            "priority" -> issues.sortedBy { it.priority.ordinal }
+            "storyPoints" -> issues.sortedBy { it.storyPoints ?: Int.MAX_VALUE }
+            else -> issues.sortedBy { it.orderIndex }
+        }
+
+        return if (sortOrder == "desc") sorted.reversed() else sorted
     }
 
     private fun Issue.toDto(): IssueDto {

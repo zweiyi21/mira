@@ -53,3 +53,15 @@ data class SprintSummaryDto(
     val completedIssues: Int,
     val incompleteIssues: Int
 )
+
+data class BurndownDataPoint(
+    val date: LocalDate,
+    val remainingPoints: Int,
+    val idealPoints: Double
+)
+
+data class BurndownChartData(
+    val sprint: SprintDto,
+    val totalPoints: Int,
+    val dataPoints: List<BurndownDataPoint>
+)

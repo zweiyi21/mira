@@ -26,6 +26,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { teamService } from '../services/teamService'
+import { userService } from '../services/userService'
 import { useAuthStore } from '../stores/authStore'
 import type { Team, TeamMember, TeamInvitation, TeamRole } from '../types'
 
@@ -360,7 +361,7 @@ function TeamsPage() {
                 }
               >
                 <List.Item.Meta
-                  avatar={<Avatar src={member.user.avatarUrl}>{member.user.name[0]}</Avatar>}
+                  avatar={<Avatar src={member.user.avatarUrl ? userService.getAvatarUrl(member.user.id) : undefined}>{member.user.name[0]}</Avatar>}
                   title={
                     <Space>
                       {member.user.name}

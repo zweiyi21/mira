@@ -8,6 +8,7 @@ interface AuthState {
   refreshToken: string | null
   isAuthenticated: boolean
   setAuth: (user: User, accessToken: string, refreshToken: string) => void
+  updateUser: (user: User) => void
   logout: () => void
 }
 
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthState>()(
           refreshToken,
           isAuthenticated: true,
         }),
+      updateUser: (user) => set({ user }),
       logout: () =>
         set({
           user: null,

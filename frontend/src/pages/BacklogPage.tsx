@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Button, Card, message, Spin, Modal, Form, Input, Select, Space, Avatar, Tag, Empty, Collapse, Badge, Segmented } from 'antd'
-import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Button, Card, message, Spin, Modal, Form, Input, Select, Space, Avatar, Tag, Empty, Collapse, Badge, Segmented, Tooltip } from 'antd'
+import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined, PlayCircleOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { projectService } from '../services/projectService'
 import { sprintService } from '../services/sprintService'
-import { issueService } from '../services/issueService'
+import { issueService, type IssueFilters } from '../services/issueService'
+import { userService } from '../services/userService'
 import { useProjectStore } from '../stores/projectStore'
-import type { Issue, IssueType, IssuePriority } from '../types'
+import type { Issue, IssueType, IssuePriority, Sprint, SprintSummary, IncompleteIssueAction } from '../types'
 import IssueCard from '../components/IssueCard'
 import IssueDetailModal from '../components/IssueDetailModal'
+import FilterBar, { type FilterValues } from '../components/FilterBar'
+import CompleteSprintModal from '../components/CompleteSprintModal'
+import BurndownChart from '../components/BurndownChart'
 
 const PRIORITY_OPTIONS: { value: IssuePriority; label: string }[] = [
   { value: 'HIGHEST', label: 'Highest' },
@@ -39,13 +43,21 @@ function BacklogPage() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [filters, setFilters] = useState<FilterValues>({})
   const [form] = Form.useForm()
+
+  // Sprint management state
+  const [completeSprintModalVisible, setCompleteSprintModalVisible] = useState(false)
+  const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null)
+  const [sprintSummary, setSprintSummary] = useState<SprintSummary | null>(null)
+  const [sprintActionLoading, setSprintActionLoading] = useState(false)
+  const [burndownRefreshKey, setBurndownRefreshKey] = useState(0)
 
   useEffect(() => {
     if (projectKey) {
       loadData()
     }
-  }, [projectKey])
+  }, [projectKey, filters])
 
   const loadData = async () => {
     if (!projectKey) return
@@ -55,22 +67,28 @@ function BacklogPage() {
         projectService.getProject(projectKey),
         sprintService.getSprints(projectKey),
         projectService.getMembers(projectKey),
-        issueService.getBacklog(projectKey),
+        issueService.getBacklog(projectKey, filters.sortBy, filters.sortOrder),
       ])
       setCurrentProject(project)
       setSprints(sprintList)
       setMembers(memberList)
-      setBacklogIssues(backlog.sort((a, b) => a.orderIndex - b.orderIndex))
+      // When sorting is applied, preserve backend order; otherwise sort by orderIndex
+      setBacklogIssues(filters.sortBy ? backlog : backlog.sort((a, b) => a.orderIndex - b.orderIndex))
 
       // Load issues for planning/active sprints
       const planningOrActiveSprints = sprintList.filter(
         (s) => s.status === 'PLANNING' || s.status === 'ACTIVE'
       )
       const issuesBySprintId: Record<number, Issue[]> = {}
+      const issueFilters: IssueFilters = {
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
+      }
       await Promise.all(
         planningOrActiveSprints.map(async (sprint) => {
-          const issues = await issueService.getIssues(projectKey, { sprintId: sprint.id })
-          issuesBySprintId[sprint.id] = issues.sort((a, b) => a.orderIndex - b.orderIndex)
+          const issues = await issueService.getIssues(projectKey, { ...issueFilters, sprintId: sprint.id })
+          // When sorting is applied, preserve backend order; otherwise sort by orderIndex
+          issuesBySprintId[sprint.id] = filters.sortBy ? issues : issues.sort((a, b) => a.orderIndex - b.orderIndex)
         })
       )
       setSprintIssues(issuesBySprintId)
@@ -153,6 +171,11 @@ function BacklogPage() {
         sprintId: newSprintId || 0, // 0 means remove from sprint (backlog)
         orderIndex: destination.index,
       })
+      // Refresh burndown chart if active sprint is involved
+      const activeSprint = sprints.find((s) => s.status === 'ACTIVE')
+      if (activeSprint && (sourceId === `sprint-${activeSprint.id}` || destId === `sprint-${activeSprint.id}`)) {
+        setBurndownRefreshKey((prev) => prev + 1)
+      }
     } catch (error) {
       message.error('Failed to move issue')
       loadData() // Reload to reset state
@@ -180,6 +203,12 @@ function BacklogPage() {
       return updated
     })
     setSelectedIssue(updatedIssue)
+
+    // Refresh burndown chart if issue is in active sprint
+    const activeSprint = sprints.find((s) => s.status === 'ACTIVE')
+    if (activeSprint && updatedIssue.sprintId === activeSprint.id) {
+      setBurndownRefreshKey((prev) => prev + 1)
+    }
   }
 
   const handleCreateIssue = async (values: {
@@ -199,6 +228,83 @@ function BacklogPage() {
       message.success('Issue created in backlog!')
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to create issue')
+    }
+  }
+
+  // Sprint management handlers
+  const handleStartSprint = async (sprint: Sprint, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!projectKey) return
+
+    // Check if there's already an active sprint
+    const activeSprint = sprints.find((s) => s.status === 'ACTIVE')
+    if (activeSprint) {
+      message.warning(`Sprint "${activeSprint.name}" is already active. Complete it first.`)
+      return
+    }
+
+    setSprintActionLoading(true)
+    try {
+      await sprintService.startSprint(projectKey, sprint.id)
+      message.success(`Sprint "${sprint.name}" started!`)
+      loadData()
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to start sprint')
+    } finally {
+      setSprintActionLoading(false)
+    }
+  }
+
+  const handleOpenCompleteModal = async (sprint: Sprint, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!projectKey) return
+
+    setSelectedSprint(sprint)
+    setSprintActionLoading(true)
+    try {
+      const summary = await sprintService.getSprintSummary(projectKey, sprint.id)
+      setSprintSummary(summary)
+      setCompleteSprintModalVisible(true)
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to load sprint summary')
+    } finally {
+      setSprintActionLoading(false)
+    }
+  }
+
+  const handleCompleteSprint = async (action: IncompleteIssueAction, targetSprintId?: number) => {
+    if (!projectKey || !selectedSprint) return
+
+    setSprintActionLoading(true)
+    try {
+      await sprintService.completeSprint(projectKey, selectedSprint.id, {
+        incompleteIssueAction: action,
+        targetSprintId,
+      })
+      message.success(`Sprint "${selectedSprint.name}" completed!`)
+      setCompleteSprintModalVisible(false)
+      setSelectedSprint(null)
+      setSprintSummary(null)
+      loadData()
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to complete sprint')
+    } finally {
+      setSprintActionLoading(false)
+    }
+  }
+
+  const handleCreateNextSprint = async () => {
+    if (!projectKey) return
+
+    setSprintActionLoading(true)
+    try {
+      const newSprint = await sprintService.createNextSprint(projectKey)
+      message.success(`Sprint "${newSprint.name}" created!`)
+      loadData()
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to create sprint')
+    } finally {
+      setSprintActionLoading(false)
     }
   }
 
@@ -241,6 +347,13 @@ function BacklogPage() {
           Create Issue
         </Button>
       </div>
+
+      <FilterBar
+        filters={filters}
+        members={members}
+        onFilterChange={setFilters}
+        onClear={() => setFilters({})}
+      />
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div style={{ display: 'flex', gap: 24 }}>
@@ -293,6 +406,28 @@ function BacklogPage() {
 
           {/* Sprint Columns */}
           <div style={{ flex: 1, minWidth: 350 }}>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                icon={<PlusOutlined />}
+                onClick={handleCreateNextSprint}
+                loading={sprintActionLoading}
+              >
+                Create Next Sprint
+              </Button>
+            </div>
+
+            {/* Burndown Chart for Active Sprint */}
+            {sprints.find((s) => s.status === 'ACTIVE') && projectKey && (
+              <div style={{ marginBottom: 16 }}>
+                <BurndownChart
+                  projectKey={projectKey}
+                  sprintId={sprints.find((s) => s.status === 'ACTIVE')!.id}
+                  sprintName={sprints.find((s) => s.status === 'ACTIVE')!.name}
+                  refreshKey={burndownRefreshKey}
+                />
+              </div>
+            )}
+
             {planningOrActiveSprints.length === 0 ? (
               <Card>
                 <Empty description="No planning or active sprints" />
@@ -303,19 +438,48 @@ function BacklogPage() {
                 items={planningOrActiveSprints.map((sprint) => ({
                   key: sprint.id.toString(),
                   label: (
-                    <Space>
-                      <span>{sprint.name}</span>
-                      <Tag color={sprint.status === 'ACTIVE' ? 'green' : 'blue'}>
-                        {sprint.status}
-                      </Tag>
-                      <Badge
-                        count={sprintIssues[sprint.id]?.length || 0}
-                        style={{ backgroundColor: '#1890ff' }}
-                      />
-                      <span style={{ color: '#666', fontSize: 12 }}>
-                        {getSprintStoryPoints(sprint.id)} pts
-                      </span>
-                    </Space>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <Space>
+                        <span>{sprint.name}</span>
+                        <Tag color={sprint.status === 'ACTIVE' ? 'green' : 'blue'}>
+                          {sprint.status}
+                        </Tag>
+                        <Badge
+                          count={sprintIssues[sprint.id]?.length || 0}
+                          style={{ backgroundColor: '#1890ff' }}
+                        />
+                        <span style={{ color: '#666', fontSize: 12 }}>
+                          {getSprintStoryPoints(sprint.id)} pts
+                        </span>
+                      </Space>
+                      <Space onClick={(e) => e.stopPropagation()}>
+                        {sprint.status === 'PLANNING' && (
+                          <Tooltip title="Start Sprint">
+                            <Button
+                              type="primary"
+                              size="small"
+                              icon={<PlayCircleOutlined />}
+                              onClick={(e) => handleStartSprint(sprint, e)}
+                              loading={sprintActionLoading}
+                            >
+                              Start
+                            </Button>
+                          </Tooltip>
+                        )}
+                        {sprint.status === 'ACTIVE' && (
+                          <Tooltip title="Complete Sprint">
+                            <Button
+                              size="small"
+                              icon={<CheckCircleOutlined />}
+                              onClick={(e) => handleOpenCompleteModal(sprint, e)}
+                              loading={sprintActionLoading}
+                            >
+                              Complete
+                            </Button>
+                          </Tooltip>
+                        )}
+                      </Space>
+                    </div>
                   ),
                   children: (
                     <Droppable droppableId={`sprint-${sprint.id}`}>
@@ -419,7 +583,7 @@ function BacklogPage() {
               {members.map((m) => (
                 <Select.Option key={m.user.id} value={m.user.id}>
                   <Space>
-                    <Avatar size="small" src={m.user.avatarUrl}>
+                    <Avatar size="small" src={m.user.avatarUrl ? userService.getAvatarUrl(m.user.id) : undefined}>
                       {m.user.name[0]}
                     </Avatar>
                     {m.user.name}
@@ -447,6 +611,21 @@ function BacklogPage() {
           setSelectedIssue(null)
         }}
         onUpdate={handleIssueUpdate}
+      />
+
+      {/* Complete Sprint Modal */}
+      <CompleteSprintModal
+        open={completeSprintModalVisible}
+        sprint={selectedSprint}
+        summary={sprintSummary}
+        availableSprints={sprints}
+        onConfirm={handleCompleteSprint}
+        onCancel={() => {
+          setCompleteSprintModalVisible(false)
+          setSelectedSprint(null)
+          setSprintSummary(null)
+        }}
+        loading={sprintActionLoading}
       />
     </div>
   )

@@ -7,16 +7,19 @@ import com.mira.model.IssueStatus
 import com.mira.repository.ProjectRepository
 import com.mira.repository.SprintRepository
 import com.mira.repository.IssueRepository
+import com.mira.repository.IssueHistoryRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 @Service
 class SprintService(
     private val sprintRepository: SprintRepository,
     private val projectRepository: ProjectRepository,
     private val issueRepository: IssueRepository,
+    private val issueHistoryRepository: IssueHistoryRepository,
     private val projectService: ProjectService,
     private val notificationService: NotificationService
 ) {
@@ -237,6 +240,82 @@ class SprintService(
         )
 
         return sprintRepository.save(sprint).toDto()
+    }
+
+    fun getBurndownData(projectKey: String, sprintId: Long, userId: Long): BurndownChartData {
+        val project = projectRepository.findByKey(projectKey.uppercase())
+            .orElseThrow { IllegalArgumentException("Project not found") }
+
+        projectService.checkMembership(project.id, userId)
+
+        val sprint = sprintRepository.findById(sprintId)
+            .orElseThrow { IllegalArgumentException("Sprint not found") }
+
+        if (sprint.project.id != project.id) {
+            throw IllegalArgumentException("Sprint does not belong to this project")
+        }
+
+        // Get all issues in the sprint
+        val issues = issueRepository.findAllByProjectIdAndSprintId(project.id, sprintId)
+        val issueIds = issues.map { it.id }
+
+        // Calculate total story points
+        val totalPoints = issues.sumOf { it.storyPoints ?: 0 }
+
+        // Get completion history for these issues
+        val completionHistory = if (issueIds.isNotEmpty()) {
+            issueHistoryRepository.findStatusCompletedByIssueIds(issueIds)
+        } else {
+            emptyList()
+        }
+
+        // Create a map of issue ID to story points
+        val issuePointsMap = issues.associate { it.id to (it.storyPoints ?: 0) }
+
+        // Create a map of date to points completed on that date
+        val pointsCompletedByDate = mutableMapOf<LocalDate, Int>()
+        completionHistory.forEach { history ->
+            val completedDate = history.createdAt.atZone(ZoneId.systemDefault()).toLocalDate()
+            val issuePoints = issuePointsMap[history.issue.id] ?: 0
+            pointsCompletedByDate[completedDate] = (pointsCompletedByDate[completedDate] ?: 0) + issuePoints
+        }
+
+        // Generate data points for each day
+        val startDate = sprint.startDate
+        val endDate = if (sprint.status == SprintStatus.ACTIVE) {
+            minOf(sprint.endDate, LocalDate.now())
+        } else {
+            sprint.endDate
+        }
+
+        val totalDays = java.time.temporal.ChronoUnit.DAYS.between(sprint.startDate, sprint.endDate).toInt()
+        val dailyIdealBurn = if (totalDays > 0) totalPoints.toDouble() / totalDays else 0.0
+
+        val dataPoints = mutableListOf<BurndownDataPoint>()
+        var remainingPoints = totalPoints
+        var currentDate = startDate
+
+        while (!currentDate.isAfter(endDate)) {
+            val dayIndex = java.time.temporal.ChronoUnit.DAYS.between(startDate, currentDate).toInt()
+            val idealPoints = maxOf(0.0, totalPoints - (dailyIdealBurn * dayIndex))
+
+            // Subtract points completed on this date
+            remainingPoints -= (pointsCompletedByDate[currentDate] ?: 0)
+
+            dataPoints.add(BurndownDataPoint(
+                date = currentDate,
+                remainingPoints = remainingPoints,
+                idealPoints = idealPoints
+            ))
+
+            currentDate = currentDate.plusDays(1)
+        }
+
+        return BurndownChartData(
+            sprint = sprint.toDto(),
+            totalPoints = totalPoints,
+            dataPoints = dataPoints
+        )
     }
 }
 

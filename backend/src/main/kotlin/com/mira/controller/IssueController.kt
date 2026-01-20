@@ -23,6 +23,8 @@ class IssueController(
         @RequestParam(required = false) priority: String?,
         @RequestParam(required = false) assigneeId: Long?,
         @RequestParam(required = false) type: String?,
+        @RequestParam(required = false) sortBy: String?,
+        @RequestParam(required = false) sortOrder: String?,
         @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<List<IssueDto>> {
         return ResponseEntity.ok(issueService.getIssues(
@@ -33,16 +35,20 @@ class IssueController(
             status = status,
             priority = priority,
             assigneeId = assigneeId,
-            type = type
+            type = type,
+            sortBy = sortBy,
+            sortOrder = sortOrder
         ))
     }
 
     @GetMapping("/backlog")
     fun getBacklog(
         @PathVariable projectKey: String,
+        @RequestParam(required = false) sortBy: String?,
+        @RequestParam(required = false) sortOrder: String?,
         @AuthenticationPrincipal principal: UserPrincipal
     ): ResponseEntity<List<IssueDto>> {
-        return ResponseEntity.ok(issueService.getBacklog(projectKey, principal.id))
+        return ResponseEntity.ok(issueService.getBacklog(projectKey, principal.id, sortBy, sortOrder))
     }
 
     @PostMapping

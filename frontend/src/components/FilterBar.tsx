@@ -1,6 +1,7 @@
 import { Input, Select, Space, Button } from 'antd'
-import { SearchOutlined, ClearOutlined } from '@ant-design/icons'
+import { SearchOutlined, ClearOutlined, SortAscendingOutlined, SortDescendingOutlined } from '@ant-design/icons'
 import type { IssueStatus, IssuePriority, IssueType, ProjectMember } from '../types'
+import type { SortField, SortOrder } from '../services/issueService'
 
 const { Search } = Input
 
@@ -10,6 +11,8 @@ export interface FilterValues {
   priority?: IssuePriority
   assigneeId?: number
   type?: IssueType
+  sortBy?: SortField
+  sortOrder?: SortOrder
 }
 
 interface FilterBarProps {
@@ -41,6 +44,13 @@ const TYPE_OPTIONS: { value: IssueType; label: string }[] = [
   { value: 'BUG', label: 'Bug' },
 ]
 
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'createdAt', label: 'Created Date' },
+  { value: 'dueDate', label: 'Due Date' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'storyPoints', label: 'Story Points' },
+]
+
 export default function FilterBar({
   filters,
   members,
@@ -52,7 +62,8 @@ export default function FilterBar({
     filters.status ||
     filters.priority ||
     filters.assigneeId ||
-    filters.type
+    filters.type ||
+    filters.sortBy
 
   return (
     <Space wrap style={{ marginBottom: 16 }}>
@@ -106,6 +117,31 @@ export default function FilterBar({
           </Select.Option>
         ))}
       </Select>
+
+      <Select
+        placeholder="Sort by"
+        allowClear
+        value={filters.sortBy}
+        onChange={(value) => onFilterChange({
+          ...filters,
+          sortBy: value,
+          sortOrder: value ? (filters.sortOrder || 'desc') : undefined,
+        })}
+        style={{ width: 140 }}
+        options={SORT_OPTIONS}
+      />
+
+      {filters.sortBy && (
+        <Button
+          icon={filters.sortOrder === 'asc' ? <SortAscendingOutlined /> : <SortDescendingOutlined />}
+          onClick={() => onFilterChange({
+            ...filters,
+            sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc',
+          })}
+        >
+          {filters.sortOrder === 'asc' ? 'Asc' : 'Desc'}
+        </Button>
+      )}
 
       {hasFilters && (
         <Button icon={<ClearOutlined />} onClick={onClear}>

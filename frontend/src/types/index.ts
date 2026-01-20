@@ -147,9 +147,19 @@ export interface TeamInvitation {
   createdAt: string
 }
 
+export interface ProjectInvitation {
+  id: number
+  project: { id: number; name: string; key: string }
+  inviter: User
+  invitee: User
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED'
+  createdAt: string
+}
+
 // Notification types
 export type NotificationType =
   | 'TEAM_INVITATION'
+  | 'PROJECT_INVITATION'
   | 'ISSUE_ASSIGNED'
   | 'ISSUE_DUE_TODAY'
   | 'ISSUE_DUE_TOMORROW'
@@ -187,4 +197,16 @@ export type IncompleteIssueAction = 'MOVE_TO_BACKLOG' | 'MOVE_TO_SPRINT'
 export interface CompleteSprintRequest {
   incompleteIssueAction: IncompleteIssueAction
   targetSprintId?: number
+}
+
+export interface BurndownDataPoint {
+  date: string
+  remainingPoints: number
+  idealPoints: number
+}
+
+export interface BurndownChartData {
+  sprint: Sprint
+  totalPoints: number
+  dataPoints: BurndownDataPoint[]
 }

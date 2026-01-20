@@ -35,6 +35,18 @@ class StorageService(
         }
     }
 
+    fun storeAvatar(file: MultipartFile, userId: Long): String {
+        val extension = file.originalFilename?.substringAfterLast('.', "jpg") ?: "jpg"
+        val filename = "${UUID.randomUUID()}.$extension"
+        val key = "avatars/$userId/$filename"
+
+        return when (storageType) {
+            "local" -> storeLocal(file, key)
+            "s3" -> storeS3(file, key)
+            else -> storeLocal(file, key)
+        }
+    }
+
     fun getFileBytes(storageKey: String): ByteArray {
         return when (storageType) {
             "local" -> getLocalFileBytes(storageKey)

@@ -89,4 +89,38 @@ class ProjectController(
     ): ResponseEntity<ProjectMemberDto> {
         return ResponseEntity.ok(projectService.updateMemberRole(key, memberId, request, principal.id))
     }
+
+    // Project invitation endpoints
+    @PostMapping("/{key}/invitations")
+    fun inviteMember(
+        @PathVariable key: String,
+        @Valid @RequestBody request: InviteMemberRequest,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ResponseEntity<ProjectInvitationDto> {
+        return ResponseEntity.ok(projectService.inviteMember(key, request, principal.id))
+    }
+
+    @GetMapping("/invitations")
+    fun getMyInvitations(
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ResponseEntity<List<ProjectInvitationDto>> {
+        return ResponseEntity.ok(projectService.getPendingInvitations(principal.id))
+    }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    fun acceptInvitation(
+        @PathVariable invitationId: Long,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ResponseEntity<ProjectMemberDto> {
+        return ResponseEntity.ok(projectService.acceptInvitation(invitationId, principal.id))
+    }
+
+    @PostMapping("/invitations/{invitationId}/decline")
+    fun declineInvitation(
+        @PathVariable invitationId: Long,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ResponseEntity<Void> {
+        projectService.declineInvitation(invitationId, principal.id)
+        return ResponseEntity.noContent().build()
+    }
 }

@@ -1,5 +1,5 @@
 import api from './api'
-import type { Sprint, SprintSummary, CompleteSprintRequest } from '../types'
+import type { Sprint, SprintSummary, CompleteSprintRequest, BurndownChartData } from '../types'
 
 export const sprintService = {
   async getSprints(projectKey: string): Promise<Sprint[]> {
@@ -44,6 +44,11 @@ export const sprintService = {
 
   async createNextSprint(projectKey: string): Promise<Sprint> {
     const response = await api.post<Sprint>(`/projects/${projectKey}/sprints/next`)
+    return response.data
+  },
+
+  async getBurndownData(projectKey: string, sprintId: number): Promise<BurndownChartData> {
+    const response = await api.get<BurndownChartData>(`/projects/${projectKey}/sprints/${sprintId}/burndown`)
     return response.data
   },
 }

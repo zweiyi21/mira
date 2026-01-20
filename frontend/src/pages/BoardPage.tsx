@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Button, Select, message, Spin, Modal, Form, Input, DatePicker, Space, Avatar, Segmented } from 'antd'
+import { Button, Select, message, Spin, Modal, Form, Input, DatePicker, Space, Avatar, Segmented, Tag, Empty } from 'antd'
 import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { projectService } from '../services/projectService'
 import { sprintService } from '../services/sprintService'
 import { issueService, type IssueFilters } from '../services/issueService'
+import { userService } from '../services/userService'
 import { useProjectStore } from '../stores/projectStore'
 import type { Issue, IssueStatus, IssueType, IssuePriority } from '../types'
 import IssueCard from '../components/IssueCard'
@@ -35,7 +36,6 @@ function BoardPage() {
   const {
     currentProject,
     setCurrentProject,
-    sprints,
     setSprints,
     currentSprint,
     setCurrentSprint,
@@ -88,19 +88,9 @@ function BoardPage() {
       setSprints(sprintList)
       setMembers(memberList)
 
-      // Auto-select active sprint
+      // Board only shows active sprint
       const activeSprint = sprintList.find((s) => s.status === 'ACTIVE')
-      if (activeSprint) {
-        setCurrentSprint(activeSprint)
-      } else if (sprintList.length > 0) {
-        setCurrentSprint(sprintList[0])
-      }
-
-      // Load all issues if no sprint selected
-      if (!activeSprint && sprintList.length === 0) {
-        const issueList = await issueService.getIssues(projectKey, filters)
-        setIssues(issueList)
-      }
+      setCurrentSprint(activeSprint || null)
     } catch (error) {
       message.error('Failed to load project data')
     } finally {
@@ -173,9 +163,13 @@ function BoardPage() {
   }
 
   const getIssuesByStatus = (status: IssueStatus): Issue[] => {
-    return issues
-      .filter((i) => i.status === status)
-      .sort((a, b) => a.orderIndex - b.orderIndex)
+    const filtered = issues.filter((i) => i.status === status)
+    // When sorting is applied from backend, preserve that order
+    if (filters.sortBy) {
+      return filtered
+    }
+    // Default: sort by orderIndex for drag-and-drop ordering
+    return filtered.sort((a, b) => a.orderIndex - b.orderIndex)
   }
 
   if (loading) {
@@ -187,7 +181,7 @@ function BoardPage() {
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
@@ -205,49 +199,63 @@ function BoardPage() {
               }}
             />
           </div>
-          <Select
-            style={{ width: 200 }}
-            placeholder="Select Sprint"
-            value={currentSprint?.id}
-            onChange={(value) => {
-              const sprint = sprints.find((s) => s.id === value)
-              setCurrentSprint(sprint || null)
-            }}
-            allowClear
-            onClear={() => {
-              setCurrentSprint(null)
-            }}
-          >
-            {sprints.map((sprint) => (
-              <Select.Option key={sprint.id} value={sprint.id}>
-                {sprint.name} {sprint.status === 'ACTIVE' && '(Active)'}
-              </Select.Option>
-            ))}
-          </Select>
+          {currentSprint ? (
+            <Space>
+              <Tag color="green">{currentSprint.name}</Tag>
+              <span style={{ color: '#666', fontSize: 12 }}>
+                {currentSprint.startDate} - {currentSprint.endDate}
+              </span>
+            </Space>
+          ) : (
+            <Tag color="orange">No Active Sprint</Tag>
+          )}
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalVisible(true)}>
-          Create Issue
-        </Button>
+        {currentSprint && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalVisible(true)}>
+            Create Issue
+          </Button>
+        )}
       </div>
 
-      <FilterBar
-        filters={filters}
-        members={members}
-        onFilterChange={setFilters}
-        onClear={() => setFilters({})}
-      />
+      {!currentSprint ? (
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Empty
+            description="No active sprint. Go to Backlog to start a sprint."
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          >
+            <Button type="primary" onClick={() => navigate(`/projects/${projectKey}/backlog`)}>
+              Go to Backlog
+            </Button>
+          </Empty>
+        </div>
+      ) : (
+        <>
+          <FilterBar
+            filters={filters}
+            members={members}
+            onFilterChange={setFilters}
+            onClear={() => setFilters({})}
+          />
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16 }}>
+          <DragDropContext onDragEnd={handleDragEnd}>
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          flex: 1,
+          minHeight: 0,
+        }}>
           {STATUS_COLUMNS.map((column) => (
             <div
               key={column.key}
               style={{
-                minWidth: 280,
-                maxWidth: 280,
+                flex: 1,
+                minWidth: 200,
                 background: '#f4f5f7',
                 borderRadius: 8,
                 padding: 8,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
               }}
             >
               <div
@@ -268,10 +276,12 @@ function BoardPage() {
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     style={{
-                      minHeight: 400,
+                      flex: 1,
+                      overflowY: 'auto',
                       background: snapshot.isDraggingOver ? '#e6f7ff' : 'transparent',
                       borderRadius: 4,
                       transition: 'background 0.2s',
+                      paddingBottom: 8,
                     }}
                   >
                     {getIssuesByStatus(column.key).map((issue, index) => (
@@ -295,6 +305,8 @@ function BoardPage() {
           ))}
         </div>
       </DragDropContext>
+        </>
+      )}
 
       <Modal
         title="Create Issue"
@@ -361,7 +373,7 @@ function BoardPage() {
               {members.map((m) => (
                 <Select.Option key={m.user.id} value={m.user.id}>
                   <Space>
-                    <Avatar size="small" src={m.user.avatarUrl}>
+                    <Avatar size="small" src={m.user.avatarUrl ? userService.getAvatarUrl(m.user.id) : undefined}>
                       {m.user.name[0]}
                     </Avatar>
                     {m.user.name}

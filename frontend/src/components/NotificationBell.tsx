@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Badge, Dropdown, List, Typography, Button, Empty, Spin, Space, Tag } from 'antd'
-import { BellOutlined } from '@ant-design/icons'
+import { Badge, Dropdown, List, Typography, Button, Empty, Spin, Space, Tag, message } from 'antd'
+import { BellOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { notificationService } from '../services/notificationService'
+import { projectService } from '../services/projectService'
 import type { Notification, NotificationType } from '../types'
 
 dayjs.extend(relativeTime)
@@ -12,6 +13,7 @@ const { Text, Title } = Typography
 
 const TYPE_CONFIG: Record<NotificationType, { color: string; label: string }> = {
   TEAM_INVITATION: { color: 'blue', label: 'Team' },
+  PROJECT_INVITATION: { color: 'geekblue', label: 'Project' },
   ISSUE_ASSIGNED: { color: 'green', label: 'Assigned' },
   ISSUE_DUE_TODAY: { color: 'orange', label: 'Due Today' },
   ISSUE_DUE_TOMORROW: { color: 'gold', label: 'Due Tomorrow' },
@@ -27,6 +29,8 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [actionLoading, setActionLoading] = useState<Record<number, boolean>>({})
+  const [respondedInvitations, setRespondedInvitations] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadUnreadCount()
@@ -86,6 +90,52 @@ export default function NotificationBell() {
     }
   }
 
+  const getInvitationIdFromNotification = (notification: Notification): number | null => {
+    if (!notification.data) return null
+    try {
+      const data = JSON.parse(notification.data)
+      return data.invitationId || null
+    } catch {
+      return null
+    }
+  }
+
+  const handleAcceptInvitation = async (notification: Notification) => {
+    const invitationId = getInvitationIdFromNotification(notification)
+    if (!invitationId) return
+
+    setActionLoading((prev) => ({ ...prev, [notification.id]: true }))
+    try {
+      await projectService.acceptInvitation(invitationId)
+      setRespondedInvitations((prev) => new Set(prev).add(notification.id))
+      await handleMarkAsRead(notification.id)
+      message.success('Invitation accepted! You are now a member of the project.')
+    } catch (error) {
+      console.error('Failed to accept invitation:', error)
+      message.error('Failed to accept invitation')
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [notification.id]: false }))
+    }
+  }
+
+  const handleDeclineInvitation = async (notification: Notification) => {
+    const invitationId = getInvitationIdFromNotification(notification)
+    if (!invitationId) return
+
+    setActionLoading((prev) => ({ ...prev, [notification.id]: true }))
+    try {
+      await projectService.declineInvitation(invitationId)
+      setRespondedInvitations((prev) => new Set(prev).add(notification.id))
+      await handleMarkAsRead(notification.id)
+      message.info('Invitation declined')
+    } catch (error) {
+      console.error('Failed to decline invitation:', error)
+      message.error('Failed to decline invitation')
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [notification.id]: false }))
+    }
+  }
+
   const dropdownContent = (
     <div
       style={{
@@ -127,15 +177,19 @@ export default function NotificationBell() {
           dataSource={notifications}
           renderItem={(notification) => {
             const config = TYPE_CONFIG[notification.type]
+            const isProjectInvitation = notification.type === 'PROJECT_INVITATION'
+            const hasResponded = respondedInvitations.has(notification.id)
+            const isLoading = actionLoading[notification.id]
+
             return (
               <List.Item
                 style={{
                   padding: '12px 16px',
                   background: notification.isRead ? 'transparent' : '#f6ffed',
-                  cursor: 'pointer',
+                  cursor: isProjectInvitation ? 'default' : 'pointer',
                   borderBottom: '1px solid #f0f0f0',
                 }}
-                onClick={() => !notification.isRead && handleMarkAsRead(notification.id)}
+                onClick={() => !isProjectInvitation && !notification.isRead && handleMarkAsRead(notification.id)}
               >
                 <div style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -157,6 +211,38 @@ export default function NotificationBell() {
                   <Text type="secondary" style={{ fontSize: 13 }}>
                     {notification.message}
                   </Text>
+                  {isProjectInvitation && !hasResponded && !notification.isRead && (
+                    <Space style={{ marginTop: 8 }}>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<CheckOutlined />}
+                        loading={isLoading}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAcceptInvitation(notification)
+                        }}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="small"
+                        icon={<CloseOutlined />}
+                        loading={isLoading}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeclineInvitation(notification)
+                        }}
+                      >
+                        Decline
+                      </Button>
+                    </Space>
+                  )}
+                  {isProjectInvitation && hasResponded && (
+                    <Text type="secondary" style={{ display: 'block', marginTop: 8, fontStyle: 'italic' }}>
+                      Responded
+                    </Text>
+                  )}
                 </div>
               </List.Item>
             )

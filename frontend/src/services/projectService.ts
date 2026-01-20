@@ -1,5 +1,5 @@
 import api from './api'
-import type { Project, ProjectMember } from '../types'
+import type { Project, ProjectMember, ProjectInvitation } from '../types'
 
 export const projectService = {
   async getProjects(): Promise<Project[]> {
@@ -47,5 +47,25 @@ export const projectService = {
 
   async deleteProject(key: string): Promise<void> {
     await api.delete(`/projects/${key}`)
+  },
+
+  // Project invitation methods
+  async inviteMember(key: string, email: string): Promise<ProjectInvitation> {
+    const response = await api.post<ProjectInvitation>(`/projects/${key}/invitations`, { email })
+    return response.data
+  },
+
+  async getMyInvitations(): Promise<ProjectInvitation[]> {
+    const response = await api.get<ProjectInvitation[]>('/projects/invitations')
+    return response.data
+  },
+
+  async acceptInvitation(invitationId: number): Promise<ProjectMember> {
+    const response = await api.post<ProjectMember>(`/projects/invitations/${invitationId}/accept`)
+    return response.data
+  },
+
+  async declineInvitation(invitationId: number): Promise<void> {
+    await api.post(`/projects/invitations/${invitationId}/decline`)
   },
 }
