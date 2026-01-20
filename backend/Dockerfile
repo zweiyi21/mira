@@ -9,15 +9,15 @@ RUN gradle build -x test --no-daemon
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Create non-root user
-RUN addgroup -S mira && adduser -S mira -G mira
-USER mira
+# Create non-root user and uploads directory
+RUN addgroup -S mira && adduser -S mira -G mira && \
+    mkdir -p /app/uploads && \
+    chown -R mira:mira /app
 
 # Copy built jar
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=build --chown=mira:mira /app/build/libs/*.jar app.jar
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
+USER mira
 
 EXPOSE 8080
 
