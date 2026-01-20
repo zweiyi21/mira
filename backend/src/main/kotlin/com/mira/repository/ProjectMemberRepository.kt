@@ -13,6 +13,7 @@ interface ProjectMemberRepository : JpaRepository<ProjectMember, Long> {
     fun findAllByUserId(userId: Long): List<ProjectMember>
     fun existsByProjectIdAndUserId(projectId: Long, userId: Long): Boolean
     fun deleteByProjectIdAndUserId(projectId: Long, userId: Long)
+    fun deleteAllByProjectId(projectId: Long)
 
     fun findByProjectIdAndUserIdAndRoleIn(
         projectId: Long,

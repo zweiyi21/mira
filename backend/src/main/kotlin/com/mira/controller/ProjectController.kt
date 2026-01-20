@@ -44,6 +44,15 @@ class ProjectController(
         return ResponseEntity.ok(projectService.updateProject(key, request, principal.id))
     }
 
+    @DeleteMapping("/{key}")
+    fun deleteProject(
+        @PathVariable key: String,
+        @AuthenticationPrincipal principal: UserPrincipal
+    ): ResponseEntity<Void> {
+        projectService.deleteProject(key, principal.id)
+        return ResponseEntity.noContent().build()
+    }
+
     @GetMapping("/{key}/members")
     fun getMembers(
         @PathVariable key: String,

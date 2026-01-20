@@ -77,6 +77,23 @@ class ProjectService(
         return projectRepository.save(project).toDto()
     }
 
+    @Transactional
+    fun deleteProject(key: String, userId: Long) {
+        val project = projectRepository.findByKey(key.uppercase())
+            .orElseThrow { IllegalArgumentException("Project not found") }
+
+        // Only owner can delete the project
+        if (project.owner.id != userId) {
+            throw IllegalArgumentException("Only project owner can delete the project")
+        }
+
+        // Delete all project members first
+        projectMemberRepository.deleteAllByProjectId(project.id)
+
+        // Delete the project
+        projectRepository.delete(project)
+    }
+
     fun getProjectMembers(key: String, userId: Long): List<ProjectMemberDto> {
         val project = projectRepository.findByKey(key.uppercase())
             .orElseThrow { IllegalArgumentException("Project not found") }

@@ -44,4 +44,8 @@ export const projectService = {
   async removeMember(key: string, memberId: number): Promise<void> {
     await api.delete(`/projects/${key}/members/${memberId}`)
   },
+
+  async deleteProject(key: string): Promise<void> {
+    await api.delete(`/projects/${key}`)
+  },
 }

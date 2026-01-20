@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, List, Modal, Form, Input, message, Empty } from 'antd'
-import { PlusOutlined, ProjectOutlined } from '@ant-design/icons'
+import { PlusOutlined, ProjectOutlined, DeleteOutlined } from '@ant-design/icons'
 import { projectService } from '../services/projectService'
 import { useProjectStore } from '../stores/projectStore'
 import type { Project } from '../types'
@@ -45,6 +45,25 @@ function ProjectsPage() {
     navigate(`/projects/${project.key}/board`)
   }
 
+  const handleDeleteProject = (project: Project) => {
+    Modal.confirm({
+      title: 'Delete Project',
+      content: `Are you sure you want to delete "${project.name}"? This action cannot be undone.`,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await projectService.deleteProject(project.key)
+          setProjects(projects.filter(p => p.id !== project.id))
+          message.success('Project deleted')
+        } catch (error: any) {
+          message.error(error.response?.data?.message || 'Failed to delete project')
+        }
+      },
+    })
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -69,6 +88,14 @@ function ProjectsPage() {
                 actions={[
                   <Button type="link" onClick={(e) => { e.stopPropagation(); goToBoard(project) }}>
                     Open Board
+                  </Button>,
+                  <Button
+                    type="link"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteProject(project) }}
+                  >
+                    Delete
                   </Button>,
                 ]}
               >
