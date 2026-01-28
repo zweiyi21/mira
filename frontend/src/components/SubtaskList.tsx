@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { List, Input, Button, Progress, Tag, Space, message, Checkbox } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { List, Input, Button, Progress, Tag, Space, message, Checkbox, Popconfirm } from 'antd'
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { Issue, IssueType } from '../types'
 import { issueService } from '../services/issueService'
 import { useProjectStore } from '../stores/projectStore'
@@ -10,6 +10,7 @@ interface SubtaskListProps {
   projectKey: string
   onSubtaskCreated: (issue: Issue) => void
   onSubtaskClick: (issue: Issue) => void
+  onSubtaskDeleted?: (issueKey: string) => void
 }
 
 const TYPE_COLORS: Record<IssueType, string> = {
@@ -24,8 +25,9 @@ export default function SubtaskList({
   projectKey,
   onSubtaskCreated,
   onSubtaskClick,
+  onSubtaskDeleted,
 }: SubtaskListProps) {
-  const { issues, updateIssue: updateStoreIssue } = useProjectStore()
+  const { issues, updateIssue: updateStoreIssue, removeIssue } = useProjectStore()
   const [showInput, setShowInput] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [creating, setCreating] = useState(false)
@@ -68,6 +70,17 @@ export default function SubtaskList({
     }
   }
 
+  const handleDeleteSubtask = async (subtaskKey: string) => {
+    try {
+      await issueService.deleteIssue(projectKey, subtaskKey)
+      removeIssue(subtaskKey)
+      onSubtaskDeleted?.(subtaskKey)
+      message.success('Subtask deleted')
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to delete subtask')
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
@@ -90,6 +103,15 @@ export default function SubtaskList({
                 <Tag key="status" color={subtask.status === 'DONE' ? 'success' : 'default'}>
                   {subtask.status.replace('_', ' ')}
                 </Tag>,
+                <Popconfirm
+                  key="delete"
+                  title="Delete this subtask?"
+                  onConfirm={() => handleDeleteSubtask(subtask.key)}
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button type="text" danger size="small" icon={<DeleteOutlined />} />
+                </Popconfirm>,
               ]}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>

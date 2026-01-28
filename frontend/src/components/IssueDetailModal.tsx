@@ -12,6 +12,8 @@ import {
   Space,
   message,
   Spin,
+  Button,
+  Popconfirm,
 } from 'antd'
 import {
   UserOutlined,
@@ -22,6 +24,8 @@ import {
   CheckSquareOutlined,
   BugOutlined,
   CloseOutlined,
+  DeleteOutlined,
+  ArrowLeftOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Issue, IssueType, IssuePriority, IssueStatus } from '../types'
@@ -66,6 +70,7 @@ interface IssueDetailModalProps {
   onClose: () => void
   onUpdate: (issue: Issue) => void
   onSubtaskCreated?: (issue: Issue) => void
+  onDelete?: (issueKey: string) => void
 }
 
 export default function IssueDetailModal({
@@ -75,9 +80,11 @@ export default function IssueDetailModal({
   onClose,
   onUpdate,
   onSubtaskCreated,
+  onDelete,
 }: IssueDetailModalProps) {
-  const { members, addIssue } = useProjectStore()
-  const [, setSelectedSubtask] = useState<Issue | null>(null)
+  const { members, addIssue, issues } = useProjectStore()
+  const [currentIssue, setCurrentIssue] = useState<Issue | null>(issue)
+  const [navigationStack, setNavigationStack] = useState<Issue[]>([])
   const [loading, setLoading] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
@@ -86,19 +93,33 @@ export default function IssueDetailModal({
 
   useEffect(() => {
     if (issue) {
+      setCurrentIssue(issue)
+      setNavigationStack([])
       setTitle(issue.title)
       setDescription(issue.description || '')
+      setEditingTitle(false)
+      setEditingDescription(false)
     }
   }, [issue])
 
-  if (!issue) return null
+  useEffect(() => {
+    if (currentIssue) {
+      setTitle(currentIssue.title)
+      setDescription(currentIssue.description || '')
+      setEditingTitle(false)
+      setEditingDescription(false)
+    }
+  }, [currentIssue?.key])
+
+  if (!issue || !currentIssue) return null
 
   const handleUpdateField = async (field: string, value: any) => {
     setLoading(true)
     try {
-      const updated = await issueService.updateIssue(projectKey, issue.key, {
+      const updated = await issueService.updateIssue(projectKey, currentIssue.key, {
         [field]: value,
       })
+      setCurrentIssue(updated)
       onUpdate(updated)
       message.success('Updated successfully')
     } catch (error: any) {
@@ -109,20 +130,20 @@ export default function IssueDetailModal({
   }
 
   const handleSaveTitle = async () => {
-    if (title !== issue.title) {
+    if (title !== currentIssue.title) {
       await handleUpdateField('title', title)
     }
     setEditingTitle(false)
   }
 
   const handleSaveDescription = async () => {
-    if (description !== (issue.description || '')) {
+    if (description !== (currentIssue.description || '')) {
       await handleUpdateField('description', description)
     }
     setEditingDescription(false)
   }
 
-  const typeConfig = TYPE_CONFIG[issue.type]
+  const typeConfig = TYPE_CONFIG[currentIssue.type]
 
   const handleSubtaskCreated = (newIssue: Issue) => {
     addIssue(newIssue)
@@ -130,7 +151,29 @@ export default function IssueDetailModal({
   }
 
   const handleSubtaskClick = (subtask: Issue) => {
-    setSelectedSubtask(subtask)
+    setNavigationStack([...navigationStack, currentIssue])
+    setCurrentIssue(subtask)
+  }
+
+  const handleBack = () => {
+    if (navigationStack.length > 0) {
+      const newStack = [...navigationStack]
+      const parent = newStack.pop()!
+      setNavigationStack(newStack)
+      // Get the latest version of parent from store if available
+      const latestParent = issues.find(i => i.key === parent.key) || parent
+      setCurrentIssue(latestParent)
+    }
+  }
+
+  const handleDeleteCurrentIssue = () => {
+    if (onDelete) {
+      onDelete(currentIssue.key)
+      // If we're viewing a subtask, go back to parent after delete
+      if (navigationStack.length > 0) {
+        handleBack()
+      }
+    }
   }
 
   return (
@@ -140,10 +183,37 @@ export default function IssueDetailModal({
       footer={null}
       width={900}
       title={
-        <Space>
-          <span style={{ color: typeConfig.color }}>{typeConfig.icon}</span>
-          <Text type="secondary">{issue.key}</Text>
-        </Space>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
+          <Space>
+            {navigationStack.length > 0 && (
+              <Button
+                type="text"
+                icon={<ArrowLeftOutlined />}
+                onClick={handleBack}
+                size="small"
+                style={{ marginRight: 4 }}
+              />
+            )}
+            <span style={{ color: typeConfig.color }}>{typeConfig.icon}</span>
+            <Text type="secondary">{currentIssue.key}</Text>
+            {navigationStack.length > 0 && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                (from {navigationStack[navigationStack.length - 1].key})
+              </Text>
+            )}
+          </Space>
+          {onDelete && (
+            <Popconfirm
+              title="Delete this issue?"
+              description="This action cannot be undone."
+              onConfirm={handleDeleteCurrentIssue}
+              okText="Delete"
+              okButtonProps={{ danger: true }}
+            >
+              <Button type="text" danger icon={<DeleteOutlined />} size="small" />
+            </Popconfirm>
+          )}
+        </div>
       }
       closeIcon={<CloseOutlined />}
     >
@@ -167,7 +237,7 @@ export default function IssueDetailModal({
                 style={{ marginBottom: 16, cursor: 'pointer' }}
                 onClick={() => setEditingTitle(true)}
               >
-                {issue.title}
+                {currentIssue.title}
               </Title>
             )}
 
@@ -195,7 +265,7 @@ export default function IssueDetailModal({
                   }}
                   onClick={() => setEditingDescription(true)}
                 >
-                  {issue.description || (
+                  {currentIssue.description || (
                     <Text type="secondary">Click to add description...</Text>
                   )}
                 </div>
@@ -205,7 +275,7 @@ export default function IssueDetailModal({
             {/* Subtasks */}
             <div style={{ marginBottom: 24 }}>
               <SubtaskList
-                parentIssue={issue}
+                parentIssue={currentIssue}
                 projectKey={projectKey}
                 onSubtaskCreated={handleSubtaskCreated}
                 onSubtaskClick={handleSubtaskClick}
@@ -220,7 +290,7 @@ export default function IssueDetailModal({
                   label: 'Comments',
                   children: (
                     <div style={{ padding: '16px 0' }}>
-                      <CommentList projectKey={projectKey} issueKey={issue.key} />
+                      <CommentList projectKey={projectKey} issueKey={currentIssue.key} />
                     </div>
                   ),
                 },
@@ -229,7 +299,7 @@ export default function IssueDetailModal({
                   label: 'Attachments',
                   children: (
                     <div style={{ padding: '16px 0' }}>
-                      <AttachmentList projectKey={projectKey} issueKey={issue.key} />
+                      <AttachmentList projectKey={projectKey} issueKey={currentIssue.key} />
                     </div>
                   ),
                 },
@@ -254,7 +324,7 @@ export default function IssueDetailModal({
                 Status
               </Text>
               <Select
-                value={issue.status}
+                value={currentIssue.status}
                 onChange={(value) => handleUpdateField('status', value)}
                 style={{ width: '100%' }}
                 options={STATUS_OPTIONS}
@@ -267,7 +337,7 @@ export default function IssueDetailModal({
                 <UserOutlined /> Assignee
               </Text>
               <Select
-                value={issue.assignee?.id}
+                value={currentIssue.assignee?.id}
                 onChange={(value) => handleUpdateField('assigneeId', value || 0)}
                 style={{ width: '100%' }}
                 allowClear
@@ -292,7 +362,7 @@ export default function IssueDetailModal({
                 Priority
               </Text>
               <Select
-                value={issue.priority}
+                value={currentIssue.priority}
                 onChange={(value) => handleUpdateField('priority', value)}
                 style={{ width: '100%' }}
               >
@@ -320,7 +390,7 @@ export default function IssueDetailModal({
                 Story Points
               </Text>
               <Select
-                value={issue.storyPoints}
+                value={currentIssue.storyPoints}
                 onChange={(value) => handleUpdateField('storyPoints', value)}
                 style={{ width: '100%' }}
                 allowClear
@@ -340,7 +410,7 @@ export default function IssueDetailModal({
                 <CalendarOutlined /> Due Date
               </Text>
               <DatePicker
-                value={issue.dueDate ? dayjs(issue.dueDate) : null}
+                value={currentIssue.dueDate ? dayjs(currentIssue.dueDate) : null}
                 onChange={(date) =>
                   handleUpdateField('dueDate', date ? date.format('YYYY-MM-DD') : null)
                 }
@@ -354,8 +424,8 @@ export default function IssueDetailModal({
                 <TagOutlined /> Labels
               </Text>
               <div>
-                {issue.labels.length > 0 ? (
-                  issue.labels.map((label) => (
+                {currentIssue.labels.length > 0 ? (
+                  currentIssue.labels.map((label) => (
                     <Tag key={label.id} color={label.color}>
                       {label.name}
                     </Tag>
@@ -371,13 +441,13 @@ export default function IssueDetailModal({
             {/* Meta info */}
             <div style={{ fontSize: 12, color: '#999' }}>
               <div style={{ marginBottom: 4 }}>
-                Created by {issue.creator.name}
+                Created by {currentIssue.creator.name}
               </div>
               <div style={{ marginBottom: 4 }}>
-                Created: {dayjs(issue.createdAt).format('MMM D, YYYY')}
+                Created: {dayjs(currentIssue.createdAt).format('MMM D, YYYY')}
               </div>
               <div>
-                Updated: {dayjs(issue.updatedAt).format('MMM D, YYYY HH:mm')}
+                Updated: {dayjs(currentIssue.updatedAt).format('MMM D, YYYY HH:mm')}
               </div>
             </div>
           </div>

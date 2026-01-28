@@ -43,6 +43,7 @@ function BoardPage() {
     setIssues,
     updateIssue,
     addIssue,
+    removeIssue,
     members,
     setMembers,
   } = useProjectStore()
@@ -61,6 +62,19 @@ function BoardPage() {
   const handleIssueUpdate = (updatedIssue: Issue) => {
     updateIssue(updatedIssue)
     setSelectedIssue(updatedIssue)
+  }
+
+  const handleDeleteIssue = async (issueKey: string) => {
+    if (!projectKey) return
+    try {
+      await issueService.deleteIssue(projectKey, issueKey)
+      removeIssue(issueKey)
+      setDetailModalVisible(false)
+      setSelectedIssue(null)
+      message.success('Issue deleted')
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to delete issue')
+    }
   }
 
   useEffect(() => {
@@ -401,6 +415,7 @@ function BoardPage() {
           setSelectedIssue(null)
         }}
         onUpdate={handleIssueUpdate}
+        onDelete={handleDeleteIssue}
       />
     </div>
   )

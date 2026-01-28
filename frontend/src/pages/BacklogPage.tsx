@@ -211,6 +211,28 @@ function BacklogPage() {
     }
   }
 
+  const handleDeleteIssue = async (issueKey: string) => {
+    if (!projectKey) return
+    try {
+      await issueService.deleteIssue(projectKey, issueKey)
+      // Remove from backlog
+      setBacklogIssues((prev) => prev.filter((i) => i.key !== issueKey))
+      // Remove from sprint issues
+      setSprintIssues((prev) => {
+        const updated = { ...prev }
+        Object.keys(updated).forEach((sprintId) => {
+          updated[parseInt(sprintId)] = updated[parseInt(sprintId)].filter((i) => i.key !== issueKey)
+        })
+        return updated
+      })
+      setDetailModalVisible(false)
+      setSelectedIssue(null)
+      message.success('Issue deleted')
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to delete issue')
+    }
+  }
+
   const handleCreateIssue = async (values: {
     type: IssueType
     title: string
@@ -611,6 +633,7 @@ function BacklogPage() {
           setSelectedIssue(null)
         }}
         onUpdate={handleIssueUpdate}
+        onDelete={handleDeleteIssue}
       />
 
       {/* Complete Sprint Modal */}

@@ -27,3 +27,6 @@ uploads/
 .DS_Store
 Thumbs.db
 .claude/
+
+# SSH keys
+*.pem

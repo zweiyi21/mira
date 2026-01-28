@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '../types'
+import { userService } from '../services/userService'
 
 interface AuthState {
   user: User | null
@@ -10,11 +11,12 @@ interface AuthState {
   setAuth: (user: User, accessToken: string, refreshToken: string) => void
   updateUser: (user: User) => void
   logout: () => void
+  validateSession: () => Promise<boolean>
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
@@ -34,6 +36,24 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           isAuthenticated: false,
         }),
+      validateSession: async () => {
+        const token = get().accessToken
+        if (!token) {
+          get().logout()
+          return false
+        }
+        try {
+          const user = await userService.getCurrentUser()
+          set({ user, isAuthenticated: true })
+          return true
+        } catch (error: any) {
+          if (error.response?.status === 401) {
+            get().logout()
+            return false
+          }
+          return true
+        }
+      },
     }),
     {
       name: 'mira-auth',

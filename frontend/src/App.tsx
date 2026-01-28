@@ -1,4 +1,6 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Spin } from 'antd'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -9,7 +11,31 @@ import TeamsPage from './pages/TeamsPage'
 import MainLayout from './components/MainLayout'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const { isAuthenticated, validateSession } = useAuthStore()
+  const navigate = useNavigate()
+  const [validating, setValidating] = useState(true)
+
+  useEffect(() => {
+    const checkSession = async () => {
+      if (isAuthenticated) {
+        const valid = await validateSession()
+        if (!valid) {
+          navigate('/login')
+        }
+      }
+      setValidating(false)
+    }
+    checkSession()
+  }, [])
+
+  if (validating && isAuthenticated) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />
 }
 
