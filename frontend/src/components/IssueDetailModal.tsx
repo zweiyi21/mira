@@ -26,6 +26,7 @@ import {
   CloseOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Issue, IssueType, IssuePriority, IssueStatus } from '../types'
@@ -318,6 +319,28 @@ export default function IssueDetailModal({
 
           {/* Right side - Details */}
           <div style={{ width: 250, borderLeft: '1px solid #f0f0f0', paddingLeft: 24 }}>
+            {/* Parent */}
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                <ApartmentOutlined /> Parent
+              </Text>
+              <Select
+                showSearch
+                allowClear
+                value={currentIssue.parentKey}
+                onChange={(value) => handleUpdateField('parentKey', value ?? '')}
+                style={{ width: '100%' }}
+                placeholder="None"
+                filterOption={(input, option) =>
+                  String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={issues
+                  .filter(i => i.key !== currentIssue.key && i.parentKey !== currentIssue.key)
+                  .map(i => ({ value: i.key, label: `${i.key}: ${i.title}` }))
+                }
+              />
+            </div>
+
             {/* Status */}
             <div style={{ marginBottom: 16 }}>
               <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>

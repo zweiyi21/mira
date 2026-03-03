@@ -238,6 +238,15 @@ class IssueService(
             }
         }
 
+        request.parentKey?.let { pk ->
+            val newParent = if (pk.isBlank()) null
+                            else issueRepository.findByKey(pk.uppercase()).orElse(null)
+            if (newParent?.key != issue.parent?.key) {
+                recordHistory(issue, user, "parent", issue.parent?.key, newParent?.key)
+                issue.parent = newParent
+            }
+        }
+
         request.dueDate?.let { issue.dueDate = it }
         request.orderIndex?.let { issue.orderIndex = it }
 

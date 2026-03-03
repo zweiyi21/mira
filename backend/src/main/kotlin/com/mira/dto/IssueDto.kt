@@ -35,7 +35,8 @@ data class UpdateIssueRequest(
     val sprintId: Long? = null,
     val dueDate: LocalDate? = null,
     val orderIndex: Int? = null,
-    val labelIds: List<Long>? = null
+    val labelIds: List<Long>? = null,
+    val parentKey: String? = null
 )
 
 data class MoveIssueRequest(

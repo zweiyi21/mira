@@ -112,6 +112,7 @@ export interface UpdateIssueRequest {
   dueDate?: string
   orderIndex?: number
   labelIds?: number[]
+  parentKey?: string
 }
 
 export interface MoveIssueRequest {
